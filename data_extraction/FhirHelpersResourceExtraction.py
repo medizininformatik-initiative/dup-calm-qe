@@ -5,7 +5,8 @@ import time
 
 from fhirclient.models.medicationadministration import MedicationAdministration
 
-from Constants import USER_NAME, USER_PASSWORD, ICD_SYSTEM_NAME, LOINC_SYSTEM_NAME, MAX_WORKERS, ATC_SYSTEM_NAME
+from Constants import USER_NAME, USER_PASSWORD, ICD_SYSTEM_NAME, LOINC_SYSTEM_NAME, MAX_WORKERS, ATC_SYSTEM_NAME, \
+    ASTHMA_COPD_CODES_FILE
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from FhirHelpersUtils import connect_to_server, fetch_bundle_for_code
@@ -157,3 +158,52 @@ def execute_thread_for_fetching(code_file, source, patient_list, code_type, func
     elif code_type == "ATC":
         gather_metadata("patient_count_with_medications", counter)
     print("---------------End of Code------------------------")
+
+def observation_frequencies(code_file):
+    folder_path = "fhir_results/LOINC"
+    observations_counts = defaultdict(int)
+    code_list, system = read_input_code_file(code_file)
+
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".json"):
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, 'r') as json_file:
+                data = json.load(json_file)
+                for observation in data:
+                    if 'code' in observation['resource'] and 'coding' in observation['resource']['code']:
+                        for coding in observation['resource']['code']['coding']:
+                            if LOINC_SYSTEM_NAME == coding['system'] and coding['code'] in code_list:
+                                observations_counts[coding['code']] += 1
+
+    for code, frequency in observations_counts.items():
+        print(f"{code}: {frequency}")
+    gather_metadata("observations_counts", observations_counts)
+
+def secondary_conditions_frequencies(code_file):
+    folder_path = "fhir_results/ICD"
+    code_list, system = read_input_code_file(code_file)
+    conditions_counts = defaultdict(int)
+
+    pats = set()
+    main_diagnoses_ids = set()
+
+    with open("patients_main_diagnosed_asthma_copd.json", "r") as file:
+        patients = json.load(file)
+        for conditions in patients.values():
+            main_diagnoses_ids.update(condition['id'] for condition in conditions)
+
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".json"):
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, 'r') as json_file:
+                data = json.load(json_file)
+                for condition in data:
+                    if 'code' in condition['resource'] and 'coding' in condition['resource']['code']:
+                        for coding in condition['resource']['code']['coding']:
+                            if ICD_SYSTEM_NAME == coding['system'] and coding['code'] in code_list:
+                                if condition['resource']['id'] not in main_diagnoses_ids:
+                                    pats.add(condition['resource']['subject']['reference'])
+                                    conditions_counts[coding['code']] += 1
+
+    gather_metadata("secondary_conditions_counts", conditions_counts)
+    gather_metadata("patient_count_with_secondary_conditions", len(pats))

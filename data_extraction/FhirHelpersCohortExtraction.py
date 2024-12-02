@@ -39,7 +39,7 @@ def patients_with_asthma_copd(smart):
                 condition = entry['resource']
                 if condition['subject']['reference']:
                     patient_reference = condition['subject']['reference']
-                    patients_conditions_map[patient_reference].append(condition['id'])
+                    patients_conditions_map[patient_reference].append({"id": condition['id'], "code": condition['code']})
 
     print(len(patients_conditions_map))
     gather_metadata("asthma_and_copd_patient_count", len(patients_conditions_map))
@@ -53,6 +53,8 @@ def filter_main_diagnosis(smart):
     Put the results into JSON file format.
     :param smart: Fhir Server Connector
     """
+    count_main_diagnose_type = defaultdict(int)
+
     patients_with_chief_complaint = defaultdict(list)
     with open("patients_diagnosed_asthma_copd.json", "r") as file:
         patients = json.load(file)
@@ -63,7 +65,7 @@ def filter_main_diagnosis(smart):
                 while True: #Connection might get lost sometime, try reconnect...
                     try:
                         #Check the patient with the spesific condition ID has Encounter reference.
-                        bundle = Encounter.where(struct={'_count': b'10', 'subject': patient, 'diagnosis': 'Condition/' + condition}).perform(smart.server)
+                        bundle = Encounter.where(struct={'_count': b'10', 'subject': patient, 'diagnosis': 'Condition/' + condition['id']}).perform(smart.server)
                         break
                     except Exception as exc:
                         print(f"Generated an exception: {exc} but continue to trying. \n")
@@ -76,10 +78,14 @@ def filter_main_diagnosis(smart):
                     for enc in encounter:
                         if 'diagnosis' in enc['resource']:
                             for c in enc['resource']['diagnosis']:
-                                if c['use']['coding'][0]['code'] == "CC" and ('Condition/' + condition == c['condition']['reference']): #chief complaint
+                                if c['use']['coding'][0]['code'] == "CC" and ('Condition/' + condition['id'] == c['condition']['reference']): #chief complaint
                                     patients_with_chief_complaint[patient].append(condition)
+                                    count_main_diagnose_type[condition['code']['coding'][0]['code']] += 1
 
     gather_metadata("asthma_and_copd_patients_with_chief_complaint", len(patients_with_chief_complaint))
+    gather_metadata("main_diagnosis_counts", count_main_diagnose_type)
+    gather_metadata("main_diagnosis_count", sum(count_main_diagnose_type.values()))
+
     with open("patients_main_diagnosed_asthma_copd.json", "w") as out:
         json.dump(patients_with_chief_complaint, out, indent=4)
 
