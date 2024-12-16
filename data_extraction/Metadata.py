@@ -23,7 +23,8 @@ def gather_metadata(source, count):
             #When, same patient main diagnosed at different times at different encounter (even for different code) etc.
             "main_diagnosis_counts": defaultdict(int),
             "secondary_conditions_counts": defaultdict(int),
-            "observations_counts": defaultdict(int)
+            "observations_counts": defaultdict(int),
+            "medication_counts": '',
         }
 
     metadata["execution_date"] = datetime.now().strftime("%Y-%m-%d")
