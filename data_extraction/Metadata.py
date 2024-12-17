@@ -24,7 +24,7 @@ def gather_metadata(source, count):
             "main_diagnosis_counts": defaultdict(int),
             "secondary_conditions_counts": defaultdict(int),
             "observations_counts": defaultdict(int),
-            "medication_counts": '',
+            "medication_counts": defaultdict()
         }
 
     metadata["execution_date"] = datetime.now().strftime("%Y-%m-%d")
@@ -33,7 +33,7 @@ def gather_metadata(source, count):
     if source in metadata:
         metadata[source] = count
     else:
-        print("Unknown source")
+        print(f"Source {source}, not defined with Metadata.json file.")
 
     with open('fhir_results/metadata.json', 'w') as metadata_file:
         json.dump(metadata, metadata_file, indent=4)

@@ -155,6 +155,8 @@ def execute_thread_for_fetching(code_file, source, patient_list, code_type, func
 
     if code_type == "LOINC":
         gather_metadata("patient_count_with_observations", counter)
+    elif code_type == "ATC":
+        gather_metadata("patient_count_with_medications", counter)
     else:
         pass
     print("---------------End of Code------------------------")
@@ -212,32 +214,23 @@ def secondary_conditions_frequencies(code_file):
 def fetch_atc_codes(resource_ref, system, code_list):
     smart = connect_to_server(user=USER_NAME, pw=USER_PASSWORD)
 
-    test_reference = "ADD here manually a Med/ID"
-
     try:
         source, medication_reference_id = resource_ref.split('/')
         if source:
-            # medication = Medication.read(test_reference, smart.server)
             medication = Medication.read(medication_reference_id, smart.server)
-            if medication.code and medication.code.coding:
+            if medication.code.coding:
                 for coding in medication.code.coding:
-                    print(f"Code found: {coding.code}")
                     if system == coding.system and coding.code in code_list:
                         return coding.code
-                    else:
-                        print(f"Code '{coding.code}', not included in code_list")
-                        return resource_ref
 
     except Exception as error:
         print(f"Generated an exception:{error} for {resource_ref}")
-        return resource_ref
 
 
 def medication_frequencies(code_file):
     folder_path = "fhir_results/ATC"
     code_list, system = read_input_code_file(code_file)
 
-    reference_medication_id = set()
     medication_type_and_med_reference = {}
     resource_structure = defaultdict(lambda: {
         "counting": {
@@ -257,7 +250,6 @@ def medication_frequencies(code_file):
                     if 'resource' in medicationReference:
                         resource_type = medicationReference['resource']['resourceType']
                         resource_ref = medicationReference['resource']['medicationReference']['reference']
-                        reference_medication_id.add(resource_ref)
 
                         code_name = fetch_atc_codes(resource_ref, system, code_list)
                         print("Fetched code name:", code_name)
@@ -265,7 +257,7 @@ def medication_frequencies(code_file):
                         if resource_type not in medication_type_and_med_reference:
                             medication_type_and_med_reference[resource_type] = {}
                         medication_type_and_med_reference[resource_type][code_name] = (
-                                medication_type_and_med_reference[resource_type].get(resource_ref, 0) + 1)
+                                medication_type_and_med_reference[resource_type].get(code_name, 0) + 1)
                     else:
                         print(f"{filename}  has no 'resource' statement within this file.")
 
