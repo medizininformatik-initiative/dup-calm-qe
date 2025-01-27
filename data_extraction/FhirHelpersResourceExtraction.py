@@ -4,6 +4,9 @@ import json
 import time
 
 from fhirclient.models.medication import Medication
+from fhirclient.models.medicationadministration import MedicationAdministration
+from fhirclient.models.medicationrequest import MedicationRequest
+from fhirclient.models.medicationstatement import MedicationStatement
 
 from Constants import USER_NAME, USER_PASSWORD, ICD_SYSTEM_NAME, LOINC_SYSTEM_NAME, MAX_WORKERS, ATC_SYSTEM_NAME, \
     ASTHMA_COPD_CODES_FILE
@@ -36,11 +39,14 @@ def read_input_code_file(filename):
             system = ATC_SYSTEM_NAME
             if not os.path.exists(f"fhir_results/ATC/"):
                 os.makedirs(f"fhir_results/ATC/")
+                os.makedirs(f"fhir_results/ATC/Administrations/")
+                os.makedirs(f"fhir_results/ATC/Requests/")
+                os.makedirs(f"fhir_results/ATC/Statements/")
             code_list = [code['code'] for code in lines]
 
     return code_list, system
 
-def write_results(entries, patient_counter, code_type):
+def write_results(entries, patient_counter, code_type, source):
     """
     It reads all Resources in the bundle and write to output files per patient.
     """
@@ -49,7 +55,12 @@ def write_results(entries, patient_counter, code_type):
     elif code_type == "ICD":
         whole_path = "fhir_results/ICD/" + patient_counter + "_patient_conditions.json"
     elif code_type == "ATC":
-        whole_path = "fhir_results/ATC/" + patient_counter + "_patient_medications.json"
+        if source is MedicationAdministration:
+            whole_path = "fhir_results/ATC/Administrations/" + patient_counter + "_patient_medicationAdministrations.json"
+        elif source is MedicationRequest:
+            whole_path = "fhir_results/ATC/Requests/" + patient_counter + "_patient_medicationRequests.json"
+        elif source is MedicationStatement:
+            whole_path = "fhir_results/ATC/Statements/" + patient_counter + "_patient_medicationStatements.json"
 
     with open(whole_path, 'w') as file:
         json.dump(entries, file, indent=4)
@@ -137,7 +148,7 @@ def execute_thread_for_fetching(code_file, source, patient_list, code_type, func
                 entries = future.result()
                 if entries:
                     counter += 1
-                    write_results(entries, str(counter), code_type)
+                    write_results(entries, str(counter), code_type, source)
                 print(f"Processed patient {patient} with {len(entries)} entries.\n")
             except Exception as exc:
                 print(f"Patient {patient} generated an exception: {exc}.\n")
@@ -145,18 +156,23 @@ def execute_thread_for_fetching(code_file, source, patient_list, code_type, func
 
     ###META DATA COLLECTION###
     '''
-    patient_count_with_secondary_conditions: Number of cohort patients that has secondary conditions (non main diagnosis ASTHMA OR COPD) (TO DO: ADD)
+    patient_count_with_secondary_conditions: Number of cohort patients that has secondary conditions (non main diagnosis ASTHMA OR COPD) 
     patient_count_with_observations: Number of cohort patients that has at least one observation
     patient_count_with_medications: Number of cohort patients that has at least one medication
-    conditions_counts: Frequency of each ICD code (TO DO: ADD)
-    observations_counts:Frequency of each LOINC code (TO DO: ADD)
-    medication_counts: Frequency of each ATC code (TO DO: ADD)
+    conditions_counts: Frequency of each ICD code 
+    observations_counts:Frequency of each LOINC code 
+    medication_counts: Frequency of each ATC code 
     '''
 
     if code_type == "LOINC":
         gather_metadata("patient_count_with_observations", counter)
     elif code_type == "ATC":
-        gather_metadata("patient_count_with_medications", counter)
+        if source is MedicationAdministration:
+            gather_metadata("patient_count_with_medicationAdministrations", counter)
+        elif source is MedicationRequest:
+            gather_metadata("patient_count_with_medicationRequests", counter)
+        elif source is MedicationStatement:
+            gather_metadata("patient_count_with_medicationStatements", counter)
     else:
         pass
     print("---------------End of Code------------------------")
@@ -228,46 +244,54 @@ def fetch_atc_codes(resource_ref, system, code_list):
 
 
 def medication_frequencies(code_file):
-    folder_path = "fhir_results/ATC"
+    folder_paths =  ["fhir_results/ATC/Administrations", "fhir_results/ATC/Requests", "fhir_results/ATC/Statements"]
     code_list, system = read_input_code_file(code_file)
 
-    medication_type_and_med_reference = {}
-    resource_structure = defaultdict(lambda: {
-        "counting": {
-            "total_count": 0,
-            "details_count": [],
-        }})
+    for folder_path in folder_paths:
+        medication_type_and_med_reference = {}
+        resource_structure = defaultdict(lambda: {
+            "counting": {
+                "total_count": 0,
+                "details_count": [],
+            }})
 
-    # Gathering, counting and fetching ID-references for "Medication".
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".json"):
-            file_path = os.path.join(folder_path, filename)
-            with (open(file_path, 'r') as json_file):
-                data = json.load(json_file)
-                print(f"\nReading {filename}")
+        # Gathering, counting and fetching ID-references for "Medication".
+        for filename in os.listdir(folder_path):
+            if filename.endswith(".json"):
+                file_path = os.path.join(folder_path, filename)
+                with (open(file_path, 'r') as json_file):
+                    data = json.load(json_file)
+                    print(f"\nReading {filename}")
 
-                for medicationReference in data:
-                    if 'resource' in medicationReference:
-                        resource_type = medicationReference['resource']['resourceType']
-                        resource_ref = medicationReference['resource']['medicationReference']['reference']
+                    for medicationReference in data:
+                        if 'resource' in medicationReference:
+                            resource_type = medicationReference['resource']['resourceType']
+                            resource_ref = medicationReference['resource']['medicationReference']['reference']
 
-                        code_name = fetch_atc_codes(resource_ref, system, code_list)
-                        print("Fetched code name:", code_name)
+                            code_name = fetch_atc_codes(resource_ref, system, code_list)
+                            print("Fetched code name:", code_name)
 
-                        if resource_type not in medication_type_and_med_reference:
-                            medication_type_and_med_reference[resource_type] = {}
-                        medication_type_and_med_reference[resource_type][code_name] = (
-                                medication_type_and_med_reference[resource_type].get(code_name, 0) + 1)
-                    else:
-                        print(f"{filename}  has no 'resource' statement within this file.")
+                            if resource_type not in medication_type_and_med_reference:
+                                medication_type_and_med_reference[resource_type] = {}
+                            medication_type_and_med_reference[resource_type][code_name] = (
+                                    medication_type_and_med_reference[resource_type].get(code_name, 0) + 1)
+                        else:
+                            print(f"{filename}  has no 'resource' statement within this file.")
 
-    # Estimates TOTAL counts per medication resource and structures data as outcomes
-    for resource_type, num_references in medication_type_and_med_reference.items():
-        total_count = sum(num_references.values())
-        details_count = [{ref: count} for ref, count in num_references.items()]
+        # Estimates TOTAL counts per medication resource and structures data as outcomes
+        for resource_type, num_references in medication_type_and_med_reference.items():
+            total_count = sum(num_references.values())
+            details_count = [{ref: count} for ref, count in num_references.items()]
 
-        resource_structure[resource_type]["counting"]["total_count"] = total_count
-        resource_structure[resource_type]["counting"]["details_count"] = details_count
+            resource_structure[resource_type]["counting"]["total_count"] = total_count
+            resource_structure[resource_type]["counting"]["details_count"] = details_count
 
-    print("final resource outcome", resource_structure)
-    gather_metadata("medication_counts", resource_structure)
+        print("final resource outcome", resource_structure)
+        if "Administrations" in folder_path:
+            gather_metadata("medicationAdministrations_counts", resource_structure)
+        elif "Requests" in folder_path:
+            gather_metadata("medicationRequests_counts", resource_structure)
+        elif "Statements" in folder_path:
+            gather_metadata("medicationStatements_counts", resource_structure)
+
+
