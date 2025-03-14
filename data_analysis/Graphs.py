@@ -33,18 +33,19 @@ def create_bar_graph(bar_type, keys, values, title, xlabel, ylabel, add_exact_co
             plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.05 * bar.get_height(), f'{bar.get_height():,}',  ha='center', va='bottom')
 
     plt.tight_layout()
-    os.makedirs('../graphs', exist_ok=True)
-    save_path = os.path.join('../graphs', filename)
+    os.makedirs('graphs', exist_ok=True)
+    save_path = os.path.join('graphs', filename)
     plt.savefig(save_path, format='png')
 
-meta_data = load_json("../fhir_results/metadata.json")
+meta_data = load_json("fhir_results/metadata.json")
 
+#Add other type of medication resources if you have other sources...
 data_overview = {
     "Asthma & COPD Patient Count": meta_data['asthma_and_copd_patient_count'],
     "Patients with Chief Complaint": meta_data['asthma_and_copd_patients_with_chief_complaint'],
     "Patients with Secondary Conditions": meta_data['patient_count_with_secondary_conditions'],
     "Patients with Observations": meta_data['patient_count_with_observations'],
-    "Patients with Medications": meta_data['patient_count_with_medications']
+    "Patients with MedicationAdministrations": meta_data['patient_count_with_medicationAdministrations']
 }
 main_diagnosis_counts = meta_data['main_diagnosis_counts']
 secondary_conditions_counts = meta_data['secondary_conditions_counts']
@@ -114,12 +115,11 @@ group_observation = {"Allergiediagnostik":[
 
 
 # Calculate group total counts for secondary conditions
-icd_codes = load_json("../input_files/icd_codes.json")
+icd_codes = load_json("input_files/icd_codes.json")
 secondary_conditions_groups_sums = defaultdict(int)
 for group in icd_codes["codes"]:
     group_sum = sum(secondary_conditions_counts.get(code, 0) for code in group["code"])
     secondary_conditions_groups_sums[group["description"]] = group_sum
-
 
 #Calculate group and individual total counts of Main Diagnoses COPD vs Asthma
 main_diagnosis_group_sums = defaultdict(int)
