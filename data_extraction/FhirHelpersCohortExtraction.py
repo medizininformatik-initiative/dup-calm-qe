@@ -78,9 +78,11 @@ def filter_main_diagnosis(smart):
                     for enc in encounter:
                         if 'diagnosis' in enc['resource']:
                             for c in enc['resource']['diagnosis']:
-                                if c['use']['coding'][0]['code'] == "CC" and ('Condition/' + condition['id'] == c['condition']['reference']): #chief complaint
-                                    patients_with_chief_complaint[patient].append(condition)
-                                    count_main_diagnose_type[condition['code']['coding'][0]['code']] += 1
+                                if c['use']['coding']:
+                                    for code in c['use']['coding']:
+                                        if code['code'] == "CC" and ('Condition/' + condition['id'] == c['condition']['reference']):  # chief complaint
+                                            patients_with_chief_complaint[patient].append(condition)
+                                            count_main_diagnose_type[condition['code']['coding'][0]['code']] += 1
 
     gather_metadata("asthma_and_copd_patients_with_chief_complaint", len(patients_with_chief_complaint))
     gather_metadata("main_diagnosis_counts", count_main_diagnose_type)
