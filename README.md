@@ -2,14 +2,16 @@
 
 This repository is developed to create "Study Data" for [CALM-QE Project]( https://www.calm-qe.de/).
 
-The purpose of this set of scripts is to identify a cohort of patients whose diagnoses are associated with Asthma or Chronic Obstructive Pulmonary Disease (COPD) from a given FHIR server. The scripts extract the relevant patient population (the “cohort”) based on these conditions.
+The purpose of this set of scripts is to identify a cohort of patients whose diagnoses are associated with Asthma or Chronic Obstructive Pulmonary Disease (COPD) from a given FHIR server. 
+The scripts extract the relevant patient population (the “cohort”) based on these conditions and retrieve clinical data for each patient in the cohort to support further analysis.
+This includes secondary conditions, observations, procedures, and associated medication records previously defined for the project.
 
-In addition, they retrieve comprehensive clinical data for each patient in the cohort to support further analysis. This includes secondary conditions, observations, procedures, and associated medication records.
+The resource extraction aligns with the main study protocol to provide a descriptive overview of the available data. Additionally, when required, it configures an [**optional CALM-QE fhir server**](#configure-a-fhir-server) using the extracted data.
 
 To run this project, it is necessary to cover the following requirements: 
 -	Connection to a FHIR Server 
 -	Python 3.12 
--	Docker (optional)
+-	Docker (recommended)
 
 The installation can be orchestrated directly by copying this repository locally and following the _**Set up**_ instructions, or run it directly with [**Docker**](#run-using-docker-optional). 
 
@@ -73,6 +75,7 @@ In addition, the script:
 - calculates the length of staying for inpatients
 - extracts the last 3 encounters from a patient
 - exports demographics from patients
+- extracts medication at discharge ([MII- List medication resource](https://www.medizininformatik-initiative.de/Kerndatensatz/Modul_Medikation_Version_2/List.html))
 
 After compiling the script, a metadata.json is generated as part of the outcomes to provide a general and quantitative overview of the items generated.
 
@@ -118,12 +121,9 @@ docker run --rm \
    ```
 
 
-
-
-
-
-## NOTE: Sending extracted resources to a specific project server
-After extracting the FHIR resources, the script data_transfer/sendServer.py (not Dockerized) can be used to upload the generated resources to another project FHIR server.
+## Configure a FHIR server
+### NOTE: Sending extracted resources to a specific project server
+After extracting the FHIR resources, the script `data_transfer/sendServer.py` (not Dockerized) can be used to upload the generated resources to another project FHIR server.
 Before running the script, configure the following variables:
 ```
 FHIR_SERVER = "YOUR_TARGET_SERVER_NAME/fhir"
@@ -132,5 +132,6 @@ PASSWORD = "YOUR_FHIR_PASSWORD"
 BASE_FOLDER = Path("fhir_results") #Or the location of your fhir bundles
 ```
 
-
+## Flattening data 
+To convert FHIR bundles into a tabular format (.csv), we leverage the tools and methods provided by the Medical Informatics Initiative [CALM_QE_AP1](https://github.com/medizininformatik-initiative/CALM_QE_AP1.git) project. This process utilizes the extracted resources from our project to create structured, easily analyzable data tables suitable for further analysis.
 
