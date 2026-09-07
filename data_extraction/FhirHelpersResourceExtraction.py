@@ -231,7 +231,7 @@ def build_statement_medication_map(directory):
                             entry = json.loads(line)
                             resource = entry.get("resource", {})
                             statement_id = resource.get("id")
-                            medication_ref = (resource.get("medicationReference", {}).get("reference")  )
+                            medication_ref = (resource.get("medicationReference", {}).get("reference"))
 
                             if statement_id and medication_ref:
                                 statement_ref = f"MedicationStatement/{statement_id}"
